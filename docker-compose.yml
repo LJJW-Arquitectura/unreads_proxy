@@ -1,0 +1,31 @@
+version: '2.1'
+services:
+  unreads-proxy:
+    image: wapiravaguens/unreads_proxy
+    depends_on:
+      - unreads-api
+    ports:
+      - "80:80"
+  unreads-api:
+    image: wapiravaguens/unreads_api
+    environment:
+      PORT: '5000'
+      SHOW_URLS: 'true'
+      
+      USERS_MS_URL: '192.168.99.101'
+      USERS_MS_PORT: '3000'
+      USERS_MS_ENTRY: 'users'
+      
+      BOOKLIST_URL: '192.168.99.101'
+      BOOKLIST_PORT: '3001'
+      BOOKLIST_ENTRY: 'api/v1'
+      
+      BOOKS_MS_URL: '192.168.99.101'
+      BOOKS_MS_PORT: '3002'
+      BOOKS_MS_ENTRY: 'books-ms'
+      
+      REVIEWS_SUGGESTIONS_URL: '192.168.99.101'
+      REVIEWS_SUGGESTIONS_PORT: '3003'
+      REVIEWS_ENTRY: 'reviews'
+      SUGGESTIONS_ENTRY: 'suggestions'
+      AVG_ENTRY: 'get-average'  
