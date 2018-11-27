@@ -1,31 +1,115 @@
 version: '2.1'
 services:
   unreads-proxy:
-    image: wapiravaguens/unreads_proxy
+    build: .
     depends_on:
       - unreads-api
+      - users-ms
+      - booklist-ms
+      - books-ms
+      - reviews-ms
     ports:
       - "80:80"
+
+  # unreads-api   
   unreads-api:
-    image: wapiravaguens/unreads_api
+    build: ../unreads_api
     environment:
       PORT: '5000'
       SHOW_URLS: 'true'
       
       USERS_MS_URL: '192.168.99.101'
       USERS_MS_PORT: '3000'
-      USERS_MS_ENTRY: 'users'
+      USERS_MS_ENTRY: 'users-ms/users'
       
       BOOKLIST_URL: '192.168.99.101'
       BOOKLIST_PORT: '3001'
-      BOOKLIST_ENTRY: 'api/v1'
+      BOOKLIST_ENTRY: 'booklist-ms/api/v1'
       
       BOOKS_MS_URL: '192.168.99.101'
       BOOKS_MS_PORT: '3002'
-      BOOKS_MS_ENTRY: 'books-ms'
+      BOOKS_MS_ENTRY: 'books-ms/books-ms'
       
       REVIEWS_SUGGESTIONS_URL: '192.168.99.101'
       REVIEWS_SUGGESTIONS_PORT: '3003'
-      REVIEWS_ENTRY: 'reviews'
-      SUGGESTIONS_ENTRY: 'suggestions'
-      AVG_ENTRY: 'get-average'  
+      REVIEWS_ENTRY: 'reviews-ms/reviews'
+      SUGGESTIONS_ENTRY: 'reviews-ms/suggestions'
+      AVG_ENTRY: 'reviews-ms/get-average' 
+  
+  # users-ms
+  users-ms:
+    build: ../ms-users
+    command: bundle exec rails s -p 3000 -b '0.0.0.0'
+    links:
+      - users-db
+  users-db:
+    image: postgres
+    ports:
+      - "5432"
+
+  # booklist-ms
+  booklist-ms:
+    build: ../ms-booklist
+    command: python run-app.py
+    links:
+      - booklist-db
+
+  booklist-db:
+    image: mongo:3.0.2
+    ports: 
+      - "27017:27017"
+
+  # books-ms
+  books-ms:
+    build: ../ms-books
+    depends_on:
+      books-db:
+        condition: service_healthy
+    healthcheck:
+      test: "curl -I books-ms:3002/books-ms/ --fail"
+      interval: 20s
+      retries: 10
+
+  books-db:
+    image: mysql:5.7
+    healthcheck:
+      test: "mysqlcheck -u$$MYSQL_USER -p$$MYSQL_PASSWORD $$MYSQL_DATABASE"
+      interval: 20s
+      timeout: 5s
+      retries: 15
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: books-database
+      MYSQL_USER: homestead
+      MYSQL_PASSWORD: secret
+    ports:
+      - "3307:3307"
+
+  # reviews-ms 
+  reviews-ms:
+    build:
+      context: ../ms-reviews/nodejs-microservice  
+      dockerfile: Dockerfile
+    depends_on: 
+      reviews-db:
+        condition: service_healthy
+    links:
+      - reviews-db
+      
+  reviews-db:
+    build:
+      context: ../ms-reviews/mysql-microservice
+      dockerfile: Dockerfile
+    image: mysql:5.7
+    healthcheck:
+      test: "mysqlcheck --user=root -p$$MYSQL_ROOT_PASSWORD $$MYSQL_DATABASE"
+      interval: 20s
+      timeout: 5s
+      retries: 15
+    environment:
+      MYSQL_ROOT_PASSWORD: reviewPassword
+      MYSQL_DATABASE: review_suggestions
+      #MYSQL_USER: root
+      #MYSQL_PASSWORD: reviewPassword
+    ports:
+      - "6603:3306"
