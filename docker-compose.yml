@@ -8,6 +8,7 @@ services:
       - booklist-ms
       - books-ms
       - reviews-ms
+      - UNreads-ldap
     ports:
       - "80:80"
 
@@ -18,19 +19,19 @@ services:
       PORT: '5000'
       SHOW_URLS: 'true'
       
-      USERS_MS_URL: '192.168.99.101'
+      USERS_MS_URL: '192.168.0.8'
       USERS_MS_PORT: '3000'
       USERS_MS_ENTRY: 'users-ms/users'
       
-      BOOKLIST_URL: '192.168.99.101'
+      BOOKLIST_URL: '192.168.0.8'
       BOOKLIST_PORT: '3001'
       BOOKLIST_ENTRY: 'booklist-ms/api/v1'
       
-      BOOKS_MS_URL: '192.168.99.101'
+      BOOKS_MS_URL: '192.168.0.8'
       BOOKS_MS_PORT: '3002'
       BOOKS_MS_ENTRY: 'books-ms/books-ms'
       
-      REVIEWS_SUGGESTIONS_URL: '192.168.99.101'
+      REVIEWS_SUGGESTIONS_URL: '192.168.0.8'
       REVIEWS_SUGGESTIONS_PORT: '3003'
       REVIEWS_ENTRY: 'reviews-ms/reviews'
       SUGGESTIONS_ENTRY: 'reviews-ms/suggestions'
@@ -40,6 +41,8 @@ services:
   users-ms:
     build: ../ms-users
     command: bundle exec rails s -p 3000 -b '0.0.0.0'
+    environment:
+      LDAP_URL: '192.168.0.8'
     links:
       - users-db
   users-db:
@@ -113,3 +116,51 @@ services:
       #MYSQL_PASSWORD: reviewPassword
     ports:
       - "6603:3306"
+
+  UNreads-ldap:
+    image: osixia/openldap:1.1.8
+    environment:
+      COMPOSE_HTTP_TIMEOUT: 200
+      LDAP_LOG_LEVEL: "256"
+      LDAP_ORGANISATION: "UNreads"
+      LDAP_DOMAIN: "UNreads.unal.edu.co"
+      LDAP_BASE_DN: ""
+      LDAP_ADMIN_PASSWORD: "admin"
+      LDAP_CONFIG_PASSWORD: "config"
+      LDAP_READONLY_USER: "false"
+      #LDAP_READONLY_USER_USERNAME: "readonly"
+      #LDAP_READONLY_USER_PASSWORD: "readonly"
+      LDAP_BACKEND: "hdb"
+      LDAP_TLS: "true"
+      LDAP_TLS_CRT_FILENAME: "ldap.crt"
+      LDAP_TLS_KEY_FILENAME: "ldap.key"
+      LDAP_TLS_CA_CRT_FILENAME: "ca.crt"
+      LDAP_TLS_ENFORCE: "false"
+      LDAP_TLS_CIPHER_SUITE: "SECURE256:-VERS-SSL3.0"
+      LDAP_TLS_PROTOCOL_MIN: "3.1"
+      LDAP_TLS_VERIFY_CLIENT: "demand"
+      LDAP_REPLICATION: "false"
+      #LDAP_REPLICATION_CONFIG_SYNCPROV: "binddn="cn=admin,cn=config" bindmethod=simple credentials=$LDAP_CONFIG_PASSWORD searchbase="cn=config" type=refreshAndPersist retry="60 +" timeout=1 starttls=critical"
+      #LDAP_REPLICATION_DB_SYNCPROV: "binddn="cn=admin,$LDAP_BASE_DN" bindmethod=simple credentials=$LDAP_ADMIN_PASSWORD searchbase="$LDAP_BASE_DN" type=refreshAndPersist interval=00:00:00:10 retry="60 +" timeout=1 starttls=critical"
+      #LDAP_REPLICATION_HOSTS: "#PYTHON2BASH:['ldap://ldap.example.org','ldap://ldap2.example.org']"
+      LDAP_REMOVE_CONFIG_AFTER_SETUP: "true"
+      LDAP_SSL_HELPER_PREFIX: "ldap"
+    tty: true
+    stdin_open: true
+    volumes:
+      - /var/lib/ldap
+      - /etc/ldap/slapd.d
+      - /container/service/slapd/assets/certs/
+    ports:
+      - "389:389"
+      - "636:636"
+    hostname: "UNreads.org"
+  phpldapadmin:
+    image: osixia/phpldapadmin:latest
+    environment:
+      PHPLDAPADMIN_LDAP_HOSTS: "UNreads-ldap"
+      PHPLDAPADMIN_HTTPS: "false"
+    ports:
+      - "8085:80"
+    links:
+      - UNreads-ldap
